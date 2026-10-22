@@ -319,7 +319,7 @@ class LLMService {
 
   formatImageInstruction(activeSkill, programmingLanguage) {
     const langNote = programmingLanguage ? ` If code is needed, prefer ${programmingLanguage.toUpperCase()}.` : '';
-    return `Work out what question or task this screenshot shows (it can be on any topic) and answer it directly, with a clear explanation. Only include code if the task calls for it.${langNote}`;
+    return `Work out what question or task this screenshot shows (it can be on any topic) and answer it directly and concisely (under 120 words unless the task needs code or a worked solution). Only include code if the task calls for it.${langNote}`;
   }
 
   async processTextWithSkill(text, activeSkill, sessionMemory = [], programmingLanguage = null) {
@@ -821,9 +821,10 @@ Respond to the point, without repeating the question.`;
 - Reply briefly, e.g. "I'm listening, what's your question?"
 
 ### If the message contains a question, request, or follow-up (on any topic):
-- Lead with the direct answer, then add the explanation that helps
-- Match length to the question: short for simple facts, structured with bullets or steps for complex topics
-- For math or reasoning, show the key steps and the final result
+- Be concise by default: 1-3 sentences or up to 5 short bullets, under 120 words
+- Lead with the direct answer; skip introductions, summaries, and closing offers of help
+- Give a longer, detailed answer only when the user asks for more detail (e.g. "explain", "in detail", "elaborate") or the task needs code
+- For math or reasoning, show only the key steps and the final result
 - If the speech-to-text looks garbled, answer the most likely intended question
 
 ### Coding questions:
