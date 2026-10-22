@@ -38,7 +38,14 @@ class CaptureService {
       let finalImage = image;
       if (options.area && this._isValidArea(options.area)) {
         try {
-          finalImage = image.crop(options.area);
+          // area is in DIPs; the captured image is in physical pixels
+          const scale = this._getTargetDisplay(options.displayId).scaleFactor || 1;
+          finalImage = image.crop({
+            x: Math.round(options.area.x * scale),
+            y: Math.round(options.area.y * scale),
+            width: Math.round(options.area.width * scale),
+            height: Math.round(options.area.height * scale)
+          });
         } catch (e) {
           logger.warn('Crop failed, returning full image', { error: e.message, area: options.area });
         }
@@ -66,7 +73,12 @@ class CaptureService {
 
   async captureScreenshot(options = {}) {
     const targetDisplay = this._getTargetDisplay(options.displayId);
-    const { width, height } = targetDisplay.size || { width: 1920, height: 1080 };
+    const { width: dipWidth, height: dipHeight } = targetDisplay.size || { width: 1920, height: 1080 };
+    // display.size is in DIPs; request physical pixels so text stays sharp on scaled
+    // displays (e.g. 150% scaling reports a 1920x1080 screen as 1280x720)
+    const scale = targetDisplay.scaleFactor || 1;
+    const width = Math.round(dipWidth * scale);
+    const height = Math.round(dipHeight * scale);
 
     const sources = await desktopCapturer.getSources({
       types: ['screen'],
@@ -77,12 +89,13 @@ class CaptureService {
       throw new Error('No screen sources available for capture');
     }
 
-    // Find source matching the target display by comparing sizes as heuristic
+    // Match the target display by id, falling back to comparing sizes
     let source = sources[0];
-    const match = sources.find(s => {
-      const size = s.thumbnail.getSize();
-      return size.width === width && size.height === height;
-    });
+    const match = sources.find(s => s.display_id && s.display_id === String(targetDisplay.id)) ||
+      sources.find(s => {
+        const size = s.thumbnail.getSize();
+        return size.width === width && size.height === height;
+      });
     if (match) source = match;
 
     const image = source.thumbnail;
