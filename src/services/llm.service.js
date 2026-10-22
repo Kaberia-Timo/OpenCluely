@@ -165,15 +165,17 @@ class LLMService {
         contents: [
           {
             role: 'user',
+            // Instruction after the image: small vision models follow the last text more reliably
             parts: [
-              { text: this.formatImageInstruction(activeSkill, programmingLanguage) },
-              { inlineData: { data: base64, mimeType } }
+              { inlineData: { data: base64, mimeType } },
+              { text: this.formatImageInstruction(activeSkill, programmingLanguage) }
             ]
           }
         ]
       };
 
-      this.applyGenerationDefaults(request);
+      // Lower temperature keeps the model answering instead of drifting into describing the screen
+      this.applyGenerationDefaults(request, { temperature: 0.3 });
 
       if (skillPrompt && skillPrompt.trim().length > 0) {
         request.systemInstruction = { parts: [{ text: skillPrompt }] };
@@ -267,13 +269,13 @@ class LLMService {
           {
             role: 'user',
             parts: [
-              { text: this.formatImageInstruction(activeSkill, programmingLanguage) },
-              { inlineData: { data: base64, mimeType } }
+              { inlineData: { data: base64, mimeType } },
+              { text: this.formatImageInstruction(activeSkill, programmingLanguage) }
             ]
           }
         ]
       };
-      this.applyGenerationDefaults(geminiRequest);
+      this.applyGenerationDefaults(geminiRequest, { temperature: 0.3 });
       if (skillPrompt && skillPrompt.trim().length > 0) {
         geminiRequest.systemInstruction = { parts: [{ text: skillPrompt }] };
       }
@@ -319,7 +321,13 @@ class LLMService {
 
   formatImageInstruction(activeSkill, programmingLanguage) {
     const langNote = programmingLanguage ? ` If code is needed, prefer ${programmingLanguage.toUpperCase()}.` : '';
-    return `Work out what question or task this screenshot shows (it can be on any topic) and answer it directly and concisely (under 120 words unless the task needs code or a worked solution). Only include code if the task calls for it.${langNote}`;
+    return `Work out every question or task this screenshot shows (it can be on any topic) and answer all of them. ` +
+      `Scale the answer to the content: a single simple question gets a short, direct answer; several questions, ` +
+      `multi-part problems, or dense material get a complete answer to each, numbered to match the screenshot. ` +
+      `Do not describe the screenshot, its layout, or the app it shows; respond only with the answers. ` +
+      `If the screenshot contains no question or task, say so in one sentence. ` +
+      `Ignore browser tabs, menus, taskbars and other screen clutter. ` +
+      `Skip introductions and closing remarks. Only include code if a task calls for it.${langNote}`;
   }
 
   async processTextWithSkill(text, activeSkill, sessionMemory = [], programmingLanguage = null) {
