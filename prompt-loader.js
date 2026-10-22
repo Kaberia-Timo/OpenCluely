@@ -89,14 +89,11 @@ class PromptLoader {
     
     switch (skillName) {
       case 'dsa':
-        languageInjection = `\n\n## IMPLEMENTATION LANGUAGE: ${languageUpper}
-STRICT REQUIREMENTS:
-- Respond ONLY in ${languageTitle}. Do not include any snippets or alternatives in other languages.
-- All code blocks must use triple backticks with the exact language tag: \`\`\`${fenceTag}\`\`\`.
-- Aim for the best possible time and space complexity; prefer optimal algorithms and data structures.
-- Provide: brief approach, then final ${languageTitle} implementation, followed by time/space complexity.
-- If the user's input is a problem statement (and does not include code), produce a complete, runnable ${languageTitle} solution without asking for clarification.
-- Avoid unnecessary verbosity; focus on correctness, clarity, and efficiency.`;
+        languageInjection = `\n\n## PREFERRED PROGRAMMING LANGUAGE: ${languageUpper}
+This only applies when the question involves writing code. Non-coding questions should be answered normally, with no code.
+- Write code in ${languageTitle} unless the task clearly needs another language (e.g. SQL, shell, HTML).
+- Use code fences with the matching tag, e.g. \`\`\`${fenceTag}\`\`\` for ${languageTitle}.
+- For algorithm problems with no code given, produce a complete, runnable ${languageTitle} solution with time/space complexity.`;
         break;
       default:
         languageInjection = `\n\n## PROGRAMMING LANGUAGE: ${languageUpper}\nAll code and examples must be in ${languageTitle}. Use code fences with tag: \`\`\`${fenceTag}\`\`\`.`;

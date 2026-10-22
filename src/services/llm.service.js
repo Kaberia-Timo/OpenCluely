@@ -298,8 +298,8 @@ class LLMService {
   }
 
   formatImageInstruction(activeSkill, programmingLanguage) {
-    const langNote = programmingLanguage ? ` Use only ${programmingLanguage.toUpperCase()} for any code.` : '';
-    return `Analyze this image for a ${activeSkill.toUpperCase()} question. Extract the problem concisely and provide the best possible solution with explanation and final code.${langNote}`;
+    const langNote = programmingLanguage ? ` If code is needed, prefer ${programmingLanguage.toUpperCase()}.` : '';
+    return `Work out what question or task this screenshot shows (it can be on any topic) and answer it directly, with a clear explanation. Only include code if the task calls for it.${langNote}`;
   }
 
   async processTextWithSkill(text, activeSkill, sessionMemory = [], programmingLanguage = null) {
@@ -536,16 +536,15 @@ class LLMService {
       const fenceTagMap = { cpp: 'cpp', c: 'c', python: 'python', java: 'java', javascript: 'javascript', js: 'javascript' };
       const fenceTag = fenceTagMap[norm] || norm || 'text';
 
-      // Replace all triple-backtick fences' language token with the selected tag
-      const replacedBackticks = text.replace(/```([^\n]*)\n/g, (match, info) => {
+      // Tag only untagged opening fences; keep tags the model chose (e.g. sql, bash) for general answers.
+      // Fences alternate open/close, so track state to avoid tagging closing fences.
+      let open = false;
+      const normalizedTildes = text.replace(/^(```|~~~)([^\n]*)$/gm, (match, fence, info) => {
+        open = !open;
+        if (!open) return '```';
         const current = (info || '').trim();
-        // If already the desired fenceTag as the first token, keep as is
-        if (current.split(/\s+/)[0].toLowerCase() === fenceTag) return match;
-        return '```' + fenceTag + '\n';
+        return '```' + (current || fenceTag);
       });
-
-      // Optionally normalize tildes fences to backticks with correct tag
-      const normalizedTildes = replacedBackticks.replace(/~~~([^\n]*)\n/g, () => '```' + fenceTag + '\n');
 
       return normalizedTildes;
     } catch (_) {
@@ -779,11 +778,10 @@ class LLMService {
   }
 
   getIntelligentTranscriptionPrompt(activeSkill, programmingLanguage) {
-    let prompt = `# Intelligent Transcription Response System
+    let prompt = `# General Assistant (Chat & Voice)
 
-Assume you are asked a question in ${activeSkill.toUpperCase()} mode. Your job is to intelligently respond to question/message with appropriate brevity.
-Assume you are in an interview and you need to perform best in ${activeSkill.toUpperCase()} mode.
-Always respond to the point, do not repeat the question or unnecessary information which is not related to ${activeSkill}.`;
+You are a knowledgeable, general-purpose assistant. The user may ask about anything: coding, math, science, writing, business, everyday topics, or follow-ups to earlier answers.
+Respond to the point, without repeating the question.`;
 
     // Add programming language context if provided
     if (programmingLanguage) {
@@ -792,50 +790,32 @@ Always respond to the point, do not repeat the question or unnecessary informati
       const fenceTagMap = { cpp: 'cpp', c: 'c', python: 'python', java: 'java', javascript: 'javascript', js: 'javascript' };
       const languageTitle = languageMap[lang] || (lang.charAt(0).toUpperCase() + lang.slice(1));
       const fenceTag = fenceTagMap[lang] || lang || 'text';
-      prompt += `\n\nCODING CONTEXT: Respond ONLY in ${languageTitle}. All code blocks must use triple backticks with language tag \`\`\`${fenceTag}\`\`\`. Do not include other languages unless explicitly asked.`;
+      prompt += `\n\nCODING CONTEXT: When code is needed, write it in ${languageTitle} unless the task clearly needs another language (e.g. SQL, shell). Use code fences with the matching tag, e.g. \`\`\`${fenceTag}\`\`\`. Don't add code to non-coding answers.`;
     }
 
     prompt += `
 
 ## Response Rules:
 
-### If the transcription is casual conversation, greetings, or NOT related to ${activeSkill}:
-- Respond with: "Yeah, I'm listening. Ask your question relevant to ${activeSkill}."
-- Or similar brief acknowledgments like: "I'm here, what's your ${activeSkill} question?"
+### If the message is only a greeting, filler, or background chatter with no question or request:
+- Reply briefly, e.g. "I'm listening, what's your question?"
 
-### If the transcription IS relevant to ${activeSkill} or is a follow-up question:
-- Provide a comprehensive, detailed response
-- Use bullet points, examples, and explanations
-- Focus on actionable insights and complete answers
-- Do not truncate or shorten your response
+### If the message contains a question, request, or follow-up (on any topic):
+- Lead with the direct answer, then add the explanation that helps
+- Match length to the question: short for simple facts, structured with bullets or steps for complex topics
+- For math or reasoning, show the key steps and the final result
+- If the speech-to-text looks garbled, answer the most likely intended question
 
-### Examples of casual/irrelevant messages:
-- "Hello", "Hi there", "How are you?"
-- "What's the weather like?"
-- "I'm just testing this"
-- Random conversations not related to ${activeSkill}
+### Coding questions:
+- If the input is a coding or algorithm problem with no code, give a brief approach, a complete runnable solution in a properly tagged code block, and its time/space complexity.
 
-### Examples of relevant messages:
-- Actual questions about ${activeSkill} concepts
-- Follow-up questions to previous responses
-- Requests for clarification on ${activeSkill} topics
-- Problem-solving requests related to ${activeSkill}
-
-## Response Format:
-- Keep responses detailed
-- Use bullet points for structured answers
-- Be encouraging and helpful
-- Stay focused on ${activeSkill}
-
-If the user's input is a coding or DSA problem statement and contains no code, produce a complete, runnable solution in the selected programming language without asking for more details. Always include the final implementation in a properly tagged code block.
-
-Remember: Be intelligent about filtering - only provide detailed responses when the user actually needs help with ${activeSkill}.`;
+Say so when you are unsure or when facts may be out of date.`;
 
     return prompt;
   }
 
   formatUserMessage(text, activeSkill) {
-    return `Context: ${activeSkill.toUpperCase()} analysis request\n\nText to analyze:\n${text}`;
+    return text;
   }
 
   async executeRequest(geminiRequest) {
