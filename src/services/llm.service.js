@@ -322,8 +322,11 @@ class LLMService {
   formatImageInstruction(activeSkill, programmingLanguage) {
     const langNote = programmingLanguage ? ` If code is needed, prefer ${programmingLanguage.toUpperCase()}.` : '';
     return `Work out every question or task this screenshot shows (it can be on any topic) and answer all of them. ` +
-      `Scale the answer to the content: a single simple question gets a short, direct answer; several questions, ` +
-      `multi-part problems, or dense material get a complete answer to each, numbered to match the screenshot. ` +
+      `Number each answer to match the screenshot and restate each question briefly in bold. ` +
+      `Factual or calculation questions get a short, direct answer. ` +
+      `Open-ended questions ("how would you...", "what would you do if...", "explain...") get a substantive answer: ` +
+      `3-5 sentences or 3-4 bullets covering the concrete steps you would take, why, and a brief example. ` +
+      `Don't just restate the question as an answer. ` +
       `Do not describe the screenshot, its layout, or the app it shows; respond only with the answers. ` +
       `If the screenshot contains no question or task, say so in one sentence. ` +
       `Ignore browser tabs, menus, taskbars and other screen clutter. ` +
