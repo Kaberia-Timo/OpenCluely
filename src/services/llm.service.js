@@ -15,6 +15,26 @@ class LLMService {
   }
 
   initializeClient() {
+    this.provider = (process.env.LLM_PROVIDER || config.get('llm.provider') || 'gemini').trim().toLowerCase();
+
+    if (this.provider === 'openai') {
+      const openaiKey = config.getApiKey('OPENAI');
+      if (!openaiKey || openaiKey === 'your_openai_api_key_here') {
+        logger.warn('OpenAI API key not configured', { keyExists: !!openaiKey });
+        this.isInitialized = false;
+        return;
+      }
+
+      // No SDK client: OpenAI requests go through _openAIPost
+      this.model = process.env.OPENAI_MODEL || config.get('llm.openai.model');
+      this.isInitialized = true;
+      logger.info('OpenAI provider initialized successfully', {
+        model: this.model,
+        baseUrl: this._openAIBaseUrl()
+      });
+      return;
+    }
+
     const apiKey = config.getApiKey('GEMINI');
     
     if (!apiKey || apiKey === 'your-api-key-here') {
@@ -819,6 +839,10 @@ Say so when you are unsure or when facts may be out of date.`;
   }
 
   async executeRequest(geminiRequest) {
+    if (this.provider === 'openai') {
+      return this._executeOpenAIRequest(geminiRequest);
+    }
+
     const maxRetries = config.get('llm.gemini.maxRetries');
     const timeout = config.get('llm.gemini.timeout');
     const primaryModel = this.model;
@@ -1034,6 +1058,10 @@ Say so when you are unsure or when facts may be out of date.`;
    * for each chunk.
    */
   async executeStreamingRequest(geminiRequest, onDelta) {
+    if (this.provider === 'openai') {
+      return this._executeOpenAIRequest(geminiRequest, onDelta || (() => {}));
+    }
+
     const maxRetries = config.get('llm.gemini.maxRetries');
     const apiKey = config.getApiKey('GEMINI');
     const primaryModel = this.model;
@@ -1374,6 +1402,22 @@ Say so when you are unsure or when facts may be out of date.`;
       return { success: false, error: 'Service not initialized' };
     }
 
+    if (this.provider === 'openai') {
+      const startTime = Date.now();
+      try {
+        const text = await this._executeOpenAIRequest({
+          contents: [{ role: 'user', parts: [{ text: 'Test connection. Please respond with "OK".' }] }],
+          generationConfig: this.getGenerationConfig({ temperature: 0, maxOutputTokens: 64 })
+        });
+        logger.info('OpenAI connection test successful', { response: text, model: this.model });
+        return { success: true, response: text, latency: Date.now() - startTime, model: this.model };
+      } catch (error) {
+        const errorAnalysis = this.analyzeError(error);
+        logger.error('OpenAI connection test failed', { error: error.message, errorAnalysis });
+        return { success: false, error: error.message, errorType: errorAnalysis.type, errorAnalysis };
+      }
+    }
+
     try {
       // First check network connectivity
       const networkCheck = await this.checkNetworkConnectivity();
@@ -1512,6 +1556,10 @@ Say so when you are unsure or when facts may be out of date.`;
   }
 
   async executeAlternativeRequest(geminiRequest) {
+    if (this.provider === 'openai') {
+      return this._executeOpenAIRequest(geminiRequest);
+    }
+
     const https = require('https');
     const apiKey = config.getApiKey('GEMINI');
     const primaryModel = config.get('llm.gemini.model');
@@ -1627,6 +1675,226 @@ Say so when you are unsure or when facts may be out of date.`;
         reject(new Error('Alternative request timeout'));
       });
       
+      req.write(postData);
+      req.end();
+    });
+  }
+
+  // ---- OpenAI provider ----
+  // Requests are built in Gemini's shape throughout this service; these helpers
+  // translate them to OpenAI Chat Completions so the rest of the pipeline is shared.
+
+  _openAIBaseUrl() {
+    return (process.env.OPENAI_BASE_URL || config.get('llm.openai.baseUrl')).replace(/\/+$/, '');
+  }
+
+  _isOpenAIReasoningModel(model) {
+    // o-series and gpt-5 models reject temperature/top_p and take reasoning_effort
+    return /^(o\d|gpt-5)/i.test(model || '');
+  }
+
+  _toOpenAIMessages(geminiRequest) {
+    const messages = [];
+
+    const systemText = (geminiRequest.systemInstruction?.parts || [])
+      .map(part => part?.text || '')
+      .filter(Boolean)
+      .join('\n\n');
+    if (systemText) {
+      messages.push({ role: 'system', content: systemText });
+    }
+
+    for (const item of geminiRequest.contents || []) {
+      const role = item.role === 'model' ? 'assistant' : 'user';
+      const parts = Array.isArray(item.parts) ? item.parts : [];
+
+      if (!parts.some(part => part?.inlineData)) {
+        const text = parts.map(part => part?.text || '').join('\n');
+        if (text.trim()) {
+          messages.push({ role, content: text });
+        }
+        continue;
+      }
+
+      messages.push({
+        role,
+        content: parts.map(part => part.inlineData
+          ? { type: 'image_url', image_url: { url: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}` } }
+          : { type: 'text', text: part.text || '' })
+      });
+    }
+
+    return messages;
+  }
+
+  _toOpenAIBody(geminiRequest, model, stream) {
+    const generation = geminiRequest.generationConfig || this.getGenerationConfig();
+    const body = {
+      model,
+      messages: this._toOpenAIMessages(geminiRequest),
+      max_completion_tokens: generation.maxOutputTokens || 4096
+    };
+
+    if (this._isOpenAIReasoningModel(model)) {
+      body.reasoning_effort = 'low';
+    } else {
+      if (typeof generation.temperature === 'number') body.temperature = generation.temperature;
+      if (typeof generation.topP === 'number') body.top_p = generation.topP;
+    }
+
+    if (stream) {
+      body.stream = true;
+    }
+
+    return body;
+  }
+
+  async _executeOpenAIRequest(geminiRequest, onDelta = null) {
+    const maxRetries = config.get('llm.openai.maxRetries');
+    const modelsToTry = [this.model, ...(config.get('llm.openai.fallbackModels') || [])];
+    let lastError = null;
+
+    for (const modelName of modelsToTry) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          const body = this._toOpenAIBody(geminiRequest, modelName, typeof onDelta === 'function');
+          const text = await this._openAIPost(body, onDelta);
+
+          if (!text) {
+            throw new Error('Empty response from OpenAI API');
+          }
+
+          logger.debug('OpenAI request successful', {
+            attempt,
+            model: modelName,
+            responseLength: text.length,
+            streamed: !!body.stream
+          });
+
+          return text;
+        } catch (error) {
+          lastError = error;
+          logger.warn(`OpenAI attempt ${attempt} failed for model ${modelName}`, {
+            error: error.message,
+            model: modelName,
+            remainingAttempts: maxRetries - attempt
+          });
+
+          // Bad request, auth, missing model and exhausted credit won't succeed on retry
+          if (/HTTP (400|401|403|404)|insufficient_quota/.test(error.message)) {
+            break;
+          }
+
+          if (attempt < maxRetries) {
+            await this.delay(1500 * attempt + Math.random() * 500);
+          }
+        }
+      }
+    }
+
+    const finalError = new Error(`OpenAI API failed after trying ${modelsToTry.join(', ')}: ${lastError?.message}`);
+    finalError.errorAnalysis = this.analyzeError(lastError || finalError);
+    finalError.originalError = lastError;
+    throw finalError;
+  }
+
+  _openAIPost(body, onDelta = null) {
+    const baseUrl = this._openAIBaseUrl();
+    // http allows local OpenAI-compatible servers (e.g. Ollama, LM Studio)
+    const transport = baseUrl.startsWith('http:') ? require('http') : require('https');
+    const postData = JSON.stringify(body);
+
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.getApiKey('OPENAI')}`,
+        'Content-Length': Buffer.byteLength(postData)
+      },
+      timeout: config.get('llm.openai.timeout')
+    };
+
+    return new Promise((resolve, reject) => {
+      const req = transport.request(`${baseUrl}/chat/completions`, options, (res) => {
+        res.setEncoding('utf8');
+
+        if (res.statusCode !== 200) {
+          let errBody = '';
+          res.on('data', (c) => { errBody += c; });
+          res.on('end', () => reject(new Error(`OpenAI HTTP ${res.statusCode}: ${errBody}`)));
+          return;
+        }
+
+        let data = '';
+        let fullText = '';
+        let buffer = '';
+
+        res.on('data', (chunk) => {
+          if (!body.stream) {
+            data += chunk;
+            return;
+          }
+
+          buffer += chunk;
+          let idx;
+          while ((idx = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, idx).trim();
+            buffer = buffer.slice(idx + 1);
+            if (!line.startsWith('data:')) {
+              continue;
+            }
+            const payload = line.slice(5).trim();
+            if (!payload || payload === '[DONE]') {
+              continue;
+            }
+            try {
+              const piece = JSON.parse(payload).choices?.[0]?.delta?.content;
+              if (piece) {
+                fullText += piece;
+                if (typeof onDelta === 'function') {
+                  onDelta(piece);
+                }
+              }
+            } catch (_) {
+              // Skip keep-alive or partial lines that don't parse
+            }
+          }
+        });
+
+        res.on('end', () => {
+          if (body.stream) {
+            resolve(fullText.trim());
+            return;
+          }
+
+          try {
+            const json = JSON.parse(data);
+            const choice = json.choices?.[0];
+            const text = typeof choice?.message?.content === 'string' ? choice.message.content.trim() : '';
+
+            if (choice?.finish_reason === 'length') {
+              logger.warn('OpenAI response reached max tokens limit', { model: body.model });
+            }
+            if (!text) {
+              reject(new Error(`Empty response from OpenAI API (finish_reason: ${choice?.finish_reason || 'unknown'})`));
+              return;
+            }
+
+            resolve(text);
+          } catch (parseError) {
+            reject(new Error(`Failed to parse OpenAI response: ${parseError.message}`));
+          }
+        });
+
+        res.on('error', (error) => reject(new Error(`OpenAI response error: ${error.message}`)));
+      });
+
+      req.on('error', (error) => reject(new Error(`OpenAI request failed: ${error.message}`)));
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('OpenAI request timeout'));
+      });
+
       req.write(postData);
       req.end();
     });

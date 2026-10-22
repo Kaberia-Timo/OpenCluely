@@ -39,6 +39,16 @@ class ConfigManager {
       },
 
       llm: {
+        // Overridden by LLM_PROVIDER in .env ('gemini' or 'openai')
+        provider: 'gemini',
+        openai: {
+          // Overridden by OPENAI_MODEL / OPENAI_BASE_URL in .env
+          model: 'gpt-4.1-mini',
+          fallbackModels: [],
+          baseUrl: 'https://api.openai.com/v1',
+          maxRetries: 2,
+          timeout: 60000
+        },
         gemini: {
           model: 'gemini-3.1-flash-lite',
           fallbackModels: ['gemini-2.5-flash-lite', 'gemini-3.5-flash'],
