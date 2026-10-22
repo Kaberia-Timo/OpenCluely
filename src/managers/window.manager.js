@@ -954,8 +954,10 @@ class WindowManager {
     const checkedAt = new Date().toISOString();
 
     try {
+      // Probe screens only: enumerating windows makes Chromium's WGC capturer log
+      // "Source is not capturable" every tick for minimized/protected windows.
       await desktopCapturer.getSources({
-        types: ['screen', 'window'],
+        types: ['screen'],
         thumbnailSize: { width: 1, height: 1 }
       });
 
