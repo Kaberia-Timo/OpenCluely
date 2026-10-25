@@ -17,6 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const whisperResponseTargetSelect = document.getElementById('whisperResponseTarget');
     const whisperSegmentMsInput = document.getElementById('whisperSegmentMs');
     const geminiKeyInput = document.getElementById('geminiKey');
+    const llmProviderSelect = document.getElementById('llmProvider');
+    const openaiKeyInput = document.getElementById('openaiKey');
+    const openaiModelInput = document.getElementById('openaiModel');
+    const openaiBaseUrlInput = document.getElementById('openaiBaseUrl');
     const windowGapInput = document.getElementById('windowGap');
     const codingLanguageSelect = document.getElementById('codingLanguage');
     const activeSkillSelect = document.getElementById('activeSkill');
@@ -88,6 +92,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (whisperResponseTargetSelect) whisperResponseTargetSelect.value = settings.whisperResponseTarget || 'both';
         if (whisperSegmentMsInput) whisperSegmentMsInput.value = settings.whisperSegmentMs || '';
         if (geminiKeyInput) geminiKeyInput.value = settings.geminiKey || '';
+        if (openaiKeyInput) openaiKeyInput.value = settings.openaiKey || '';
+        if (openaiModelInput) openaiModelInput.value = settings.openaiModel || '';
+        if (openaiBaseUrlInput) openaiBaseUrlInput.value = settings.openaiBaseUrl || '';
+        if (llmProviderSelect) {
+            llmProviderSelect.value = uiProviderFromSettings(settings);
+        }
         if (windowGapInput) windowGapInput.value = settings.windowGap || '';
 
         // Set C++ as default if no coding language is specified
@@ -111,6 +121,49 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         updateSpeechFieldStates();
+        updateLlmFieldStates();
+    };
+
+    // The app stores only gemini|openai in LLM_PROVIDER; Ollama and other
+    // services are "openai" with a different server address.
+    const OPENAI_DEFAULT_URL = 'https://api.openai.com/v1';
+    const OLLAMA_DEFAULT_URL = 'http://localhost:11434/v1';
+
+    const uiProviderFromSettings = (settings) => {
+        if (settings.llmProvider !== 'openai') return 'gemini';
+        const url = (settings.openaiBaseUrl || '').toLowerCase();
+        if (!url || url.startsWith(OPENAI_DEFAULT_URL)) return 'openai';
+        if (url.includes(':11434')) return 'ollama';
+        return 'custom';
+    };
+
+    const updateLlmFieldStates = () => {
+        const provider = llmProviderSelect ? llmProviderSelect.value : 'gemini';
+        const show = (id, visible) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = visible ? '' : 'none';
+        };
+        show('geminiFields', provider === 'gemini');
+        show('openaiFields', provider !== 'gemini');
+        show('openaiKeyItem', provider !== 'ollama');
+        show('ollamaNote', provider === 'ollama');
+    };
+
+    // Fill sensible defaults when switching provider, without overwriting
+    // values the user already entered for that kind of service.
+    const applyProviderDefaults = (provider) => {
+        if (!openaiBaseUrlInput || !openaiModelInput || !openaiKeyInput) return;
+        if (provider === 'ollama') {
+            openaiBaseUrlInput.value = OLLAMA_DEFAULT_URL;
+            if (!openaiModelInput.value || !openaiModelInput.value.includes(':')) openaiModelInput.value = 'gemma3:4b';
+            if (!openaiKeyInput.value) openaiKeyInput.value = 'ollama';
+        } else if (provider === 'openai') {
+            openaiBaseUrlInput.value = OPENAI_DEFAULT_URL;
+            if (!openaiModelInput.value || openaiModelInput.value.includes(':')) openaiModelInput.value = 'gpt-4.1-mini';
+            if (openaiKeyInput.value === 'ollama') openaiKeyInput.value = '';
+        } else if (provider === 'custom') {
+            if ([OPENAI_DEFAULT_URL, OLLAMA_DEFAULT_URL].includes(openaiBaseUrlInput.value)) openaiBaseUrlInput.value = '';
+        }
     };
 
     // Load settings when window opens
@@ -147,6 +200,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (whisperResponseTargetSelect) settings.whisperResponseTarget = whisperResponseTargetSelect.value;
         if (whisperSegmentMsInput) settings.whisperSegmentMs = whisperSegmentMsInput.value;
         if (geminiKeyInput) settings.geminiKey = geminiKeyInput.value;
+        if (llmProviderSelect) settings.llmProvider = llmProviderSelect.value === 'gemini' ? 'gemini' : 'openai';
+        if (openaiKeyInput) settings.openaiKey = openaiKeyInput.value;
+        if (openaiModelInput) settings.openaiModel = openaiModelInput.value;
+        if (openaiBaseUrlInput) settings.openaiBaseUrl = openaiBaseUrlInput.value;
         if (windowGapInput) settings.windowGap = windowGapInput.value;
         if (codingLanguageSelect) settings.codingLanguage = codingLanguageSelect.value;
         if (activeSkillSelect) settings.activeSkill = activeSkillSelect.value;
@@ -196,6 +253,9 @@ document.addEventListener('DOMContentLoaded', () => {
         whisperResponseTargetSelect,
         whisperSegmentMsInput,
         geminiKeyInput,
+        openaiKeyInput,
+        openaiModelInput,
+        openaiBaseUrlInput,
         windowGapInput
     ];
 
@@ -209,6 +269,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (speechProviderSelect) {
         speechProviderSelect.addEventListener('change', () => {
             updateSpeechFieldStates();
+            saveSettings();
+        });
+    }
+
+    if (llmProviderSelect) {
+        llmProviderSelect.addEventListener('change', () => {
+            applyProviderDefaults(llmProviderSelect.value);
+            updateLlmFieldStates();
             saveSettings();
         });
     }
@@ -237,6 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     updateSpeechFieldStates();
+    updateLlmFieldStates();
 
     // Initialize icon grid with correct paths
     const initializeIconGrid = () => {

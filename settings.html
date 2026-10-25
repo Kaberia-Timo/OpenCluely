@@ -459,15 +459,59 @@
             <div class="settings-section">
                 <div class="settings-section-title">
                     <i class="fas fa-robot"></i>
-                    Gemini Settings
+                    AI Provider
                 </div>
                 <div class="settings-section-content">
                     <div class="settings-item">
                         <div>
-                            <div class="settings-item-label">Google API Key</div>
-                            <div class="settings-item-description">Your Google API key for Gemini models</div>
+                            <div class="settings-item-label">Provider</div>
+                            <div class="settings-item-description">Which AI answers your questions</div>
                         </div>
-                        <input type="password" class="input-field" id="geminiKey" placeholder="Enter your Google API key">
+                        <select class="input-field" id="llmProvider">
+                            <option value="gemini">Google Gemini</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="ollama">Ollama (local, free)</option>
+                            <option value="custom">Other OpenAI-compatible</option>
+                        </select>
+                    </div>
+
+                    <!-- Gemini fields (shown only when Gemini is selected) -->
+                    <div id="geminiFields" class="settings-group">
+                        <div class="settings-item">
+                            <div>
+                                <div class="settings-item-label">Google API Key</div>
+                                <div class="settings-item-description">Free key from aistudio.google.com</div>
+                            </div>
+                            <input type="password" class="input-field" id="geminiKey" placeholder="Enter your Google API key">
+                        </div>
+                    </div>
+
+                    <!-- OpenAI-compatible fields (OpenAI, Ollama, other) -->
+                    <div id="openaiFields" class="settings-group">
+                        <div class="settings-item" id="openaiKeyItem">
+                            <div>
+                                <div class="settings-item-label">API Key</div>
+                                <div class="settings-item-description">Key for the selected service</div>
+                            </div>
+                            <input type="password" class="input-field" id="openaiKey" placeholder="sk-...">
+                        </div>
+                        <div class="settings-item">
+                            <div>
+                                <div class="settings-item-label">Model</div>
+                                <div class="settings-item-description">e.g. gpt-4.1-mini, or gemma3:4b for Ollama</div>
+                            </div>
+                            <input type="text" class="input-field" id="openaiModel" placeholder="gpt-4.1-mini">
+                        </div>
+                        <div class="settings-item">
+                            <div>
+                                <div class="settings-item-label">Server Address</div>
+                                <div class="settings-item-description">API base URL ending in /v1</div>
+                            </div>
+                            <input type="text" class="input-field" id="openaiBaseUrl" placeholder="https://api.openai.com/v1">
+                        </div>
+                        <div id="ollamaNote" class="settings-note">
+                            Install Ollama from ollama.com, then download a model once, e.g. <code>ollama pull gemma3:4b</code>. Ollama needs no API key.
+                        </div>
                     </div>
                 </div>
             </div>

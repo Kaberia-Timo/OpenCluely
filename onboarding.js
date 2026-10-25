@@ -44,6 +44,9 @@
     step: 0,
     geminiKey: '',
     geminiConfigured: false, // a key already exists in .env from a prior run
+    llmChoice: 'gemini', // 'gemini' | 'openai' | 'ollama'
+    openaiKey: '',
+    openaiModel: '',
     speechProvider: null, // 'whisper' | 'azure' | 'skip'
     azureKey: '',
     azureRegion: '',
@@ -135,6 +138,8 @@
       case 'welcome':
         return true;
       case 'apikey':
+        if (state.llmChoice === 'openai') return !!state.openaiKey.trim() && !!state.openaiModel.trim();
+        if (state.llmChoice === 'ollama') return !!state.openaiModel.trim();
         // A key already in .env is enough — don't force a re-entry.
         return !!state.geminiKey.trim() || state.geminiConfigured;
       case 'speech':
@@ -186,6 +191,34 @@
       setKeyStatus('idle', 'Key entered');
     }
   });
+
+  // Provider choice: Gemini, OpenAI, or local Ollama (OpenAI-compatible)
+  const llmChoiceSelect = $('#llmChoice');
+  const openaiKeyInput = $('#openaiKey');
+  const openaiModelInput = $('#openaiModel');
+
+  function updateLlmChoice() {
+    const choice = state.llmChoice;
+    $('#geminiBlock').style.display = choice === 'gemini' ? '' : 'none';
+    $('#openaiBlock').style.display = choice === 'gemini' ? 'none' : '';
+    $('#openaiKeyField').style.display = choice === 'openai' ? '' : 'none';
+    $('#ollamaHint').style.display = choice === 'ollama' ? '' : 'none';
+    openaiModelInput.placeholder = choice === 'ollama' ? 'gemma3:4b' : 'gpt-4.1-mini';
+  }
+
+  llmChoiceSelect.addEventListener('change', () => {
+    state.llmChoice = llmChoiceSelect.value;
+    // Swap in the matching default model unless the user typed their own
+    const defaults = { openai: 'gpt-4.1-mini', ollama: 'gemma3:4b' };
+    if (!state.openaiModel || Object.values(defaults).includes(state.openaiModel)) {
+      state.openaiModel = defaults[state.llmChoice] || '';
+      openaiModelInput.value = state.openaiModel;
+    }
+    updateLlmChoice();
+  });
+  openaiKeyInput.addEventListener('input', () => { state.openaiKey = openaiKeyInput.value.trim(); });
+  openaiModelInput.addEventListener('input', () => { state.openaiModel = openaiModelInput.value.trim(); });
+  updateLlmChoice();
 
   toggleVis.addEventListener('click', () => {
     const showing = geminiInput.type === 'text';
@@ -450,11 +483,19 @@
   // ── Wire up: Finish screen ────────────────────────────────────────
   function populateSummary() {
     const rows = [];
-    rows.push({
-      label: '<i class="fas fa-key"></i> Gemini API',
-      value: (state.geminiKey || state.geminiConfigured) ? 'Configured' : 'Missing',
-      cls: (state.geminiKey || state.geminiConfigured) ? 'ok' : 'skip',
-    });
+    if (state.llmChoice === 'gemini') {
+      rows.push({
+        label: '<i class="fas fa-key"></i> Gemini API',
+        value: (state.geminiKey || state.geminiConfigured) ? 'Configured' : 'Missing',
+        cls: (state.geminiKey || state.geminiConfigured) ? 'ok' : 'skip',
+      });
+    } else {
+      rows.push({
+        label: '<i class="fas fa-robot"></i> AI provider',
+        value: `${state.llmChoice === 'ollama' ? 'Ollama' : 'OpenAI'} (${state.openaiModel})`,
+        cls: 'ok',
+      });
+    }
     if (state.speechProvider === 'whisper') {
       rows.push({
         label: '<i class="fas fa-microphone"></i> Speech',
@@ -491,9 +532,9 @@
 
   $('#starBtn').addEventListener('click', () => {
     if (window.electronAPI && window.electronAPI.openExternal) {
-      window.electronAPI.openExternal('https://github.com/TechyCSR/OpenCluely');
+      window.electronAPI.openExternal('https://github.com/Kaberia-Timo/OpenCluely');
     } else {
-      window.open('https://github.com/TechyCSR/OpenCluely', '_blank');
+      window.open('https://github.com/Kaberia-Timo/OpenCluely', '_blank');
     }
   });
   $('#skipStarBtn').addEventListener('click', () => {
@@ -514,16 +555,20 @@
     const name = currentScreenName();
     if (!canAdvance()) {
       // Lightly nudge the user
-      if (name === 'apikey') setKeyStatus('error', 'Enter a Gemini API key');
+      if (name === 'apikey' && state.llmChoice === 'gemini') setKeyStatus('error', 'Enter a Gemini API key');
       return;
     }
 
-    // Persist settings on speech selection (Azure path), since we
-    // already saved geminiKey on test; do it here too if user skipped
-    // testing.
-    if (name === 'apikey' && state.geminiKey && window.electronAPI) {
+    // Persist the provider choice (and Gemini key, if one was typed)
+    if (name === 'apikey' && window.electronAPI) {
+      const providerSettings = {
+        gemini: { llmProvider: 'gemini' },
+        openai: { llmProvider: 'openai', openaiKey: state.openaiKey, openaiModel: state.openaiModel, openaiBaseUrl: 'https://api.openai.com/v1' },
+        ollama: { llmProvider: 'openai', openaiKey: 'ollama', openaiModel: state.openaiModel, openaiBaseUrl: 'http://localhost:11434/v1' },
+      }[state.llmChoice];
+      if (state.llmChoice === 'gemini' && state.geminiKey) providerSettings.geminiKey = state.geminiKey;
       try {
-        await window.electronAPI.saveSettings({ geminiKey: state.geminiKey });
+        await window.electronAPI.saveSettings(providerSettings);
       } catch (_) { /* surfaced elsewhere */ }
     }
     if (name === 'speech' && window.electronAPI) {

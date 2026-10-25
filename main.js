@@ -1607,6 +1607,10 @@ class ApplicationController {
       whisperResponseTarget: process.env.WHISPER_RESPONSE_TARGET || "both",
       whisperSegmentMs: process.env.WHISPER_SEGMENT_MS || "4000",
       geminiKey: process.env.GEMINI_API_KEY || "",
+      llmProvider: (process.env.LLM_PROVIDER || "gemini").trim().toLowerCase(),
+      openaiKey: process.env.OPENAI_API_KEY || "",
+      openaiModel: process.env.OPENAI_MODEL || "",
+      openaiBaseUrl: process.env.OPENAI_BASE_URL || "",
 
       azureConfigured: !!process.env.AZURE_SPEECH_KEY && !!process.env.AZURE_SPEECH_REGION,
       speechAvailable: this.speechAvailable
@@ -1678,6 +1682,18 @@ class ApplicationController {
       if (settings.geminiKey !== undefined) {
         envUpdates.GEMINI_API_KEY = settings.geminiKey;
       }
+      if (settings.llmProvider === "gemini" || settings.llmProvider === "openai") {
+        envUpdates.LLM_PROVIDER = settings.llmProvider;
+      }
+      if (settings.openaiKey !== undefined) {
+        envUpdates.OPENAI_API_KEY = settings.openaiKey;
+      }
+      if (settings.openaiModel !== undefined) {
+        envUpdates.OPENAI_MODEL = settings.openaiModel;
+      }
+      if (settings.openaiBaseUrl !== undefined) {
+        envUpdates.OPENAI_BASE_URL = settings.openaiBaseUrl;
+      }
 
       // Capture the previous whisper command BEFORE persisting — persistEnvUpdates
       // mutates process.env in place, so comparing afterwards would always read
@@ -1687,17 +1703,21 @@ class ApplicationController {
 
       const persistedKeys = this.persistEnvUpdates(envUpdates);
 
-      // If the Gemini key was just saved, reinitialize the LLM service
-      // so the new client picks up the key. Without this, the test-
-      // connection button in the onboarding wizard fails with
-      // "Service not initialized" because the client was first created
-      // at app startup, before any key was set.
-      if (settings.geminiKey !== undefined && envUpdates.GEMINI_API_KEY !== undefined) {
+      // If the provider or any of its keys/model/address were just saved,
+      // reinitialize the LLM service so the new client picks them up.
+      // Without this, the test-connection button in the onboarding wizard
+      // fails with "Service not initialized" because the client was first
+      // created at app startup, before any key was set.
+      const llmKeys = ["GEMINI_API_KEY", "LLM_PROVIDER", "OPENAI_API_KEY", "OPENAI_MODEL", "OPENAI_BASE_URL"];
+      if (llmKeys.some((key) => envUpdates[key] !== undefined)) {
         try {
           llmService.initializeClient();
-          logger.info("LLM service reinitialized after Gemini key update");
+          logger.info("LLM service reinitialized after provider settings update", {
+            provider: llmService.provider,
+            model: llmService.model
+          });
         } catch (e) {
-          logger.warn("Failed to reinitialize LLM service after Gemini key update", {
+          logger.warn("Failed to reinitialize LLM service after provider settings update", {
             error: e.message
           });
         }

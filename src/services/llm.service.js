@@ -15,6 +15,9 @@ class LLMService {
   }
 
   initializeClient() {
+    // Reset so a provider switch at runtime never leaves the previous provider marked ready
+    this.isInitialized = false;
+    this.client = null;
     this.provider = (process.env.LLM_PROVIDER || config.get('llm.provider') || 'gemini').trim().toLowerCase();
 
     if (this.provider === 'openai') {

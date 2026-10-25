@@ -740,12 +740,49 @@
 
             <!-- SCREEN 2: API Key -->
             <section class="screen" data-screen="apikey">
-                <h1>Connect Google Gemini</h1>
+                <h1>Connect an AI provider</h1>
                 <p class="subtitle">
-                    OpenCluely uses Google's Gemini to generate answers. You'll need a free API key.
+                    Choose which AI answers your questions. Google Gemini has a free tier; Ollama runs free on your own computer.
                 </p>
 
                 <div class="field">
+                    <label for="llmChoice">Provider</label>
+                    <div class="input-wrap">
+                        <i class="fas fa-robot icon"></i>
+                        <select id="llmChoice" class="input">
+                            <option value="gemini">Google Gemini (free API key)</option>
+                            <option value="openai">OpenAI (paid API key)</option>
+                            <option value="ollama">Ollama (local, free, no key)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field" id="openaiBlock" style="display:none;">
+                    <div id="openaiKeyField">
+                        <label for="openaiKey">OpenAI API Key</label>
+                        <div class="input-wrap">
+                            <i class="fas fa-key icon"></i>
+                            <input type="password" id="openaiKey" class="input" placeholder="sk-…" autocomplete="off" spellcheck="false">
+                        </div>
+                        <div class="hint">
+                            Create one at
+                            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">platform.openai.com/api-keys</a>
+                            (needs prepaid credit; a ChatGPT subscription doesn't include API use).
+                        </div>
+                    </div>
+                    <label for="openaiModel" style="margin-top:12px;">Model</label>
+                    <div class="input-wrap">
+                        <i class="fas fa-microchip icon"></i>
+                        <input type="text" id="openaiModel" class="input" placeholder="gpt-4.1-mini" autocomplete="off" spellcheck="false">
+                    </div>
+                    <div class="hint" id="ollamaHint" style="display:none;">
+                        Install Ollama from
+                        <a href="https://ollama.com/download" target="_blank" rel="noreferrer">ollama.com/download</a>,
+                        then download a model once, e.g. <code>ollama pull gemma3:4b</code> (reads screenshots too).
+                    </div>
+                </div>
+
+                <div class="field" id="geminiBlock">
                     <label for="geminiKey">Gemini API Key</label>
                     <div class="input-wrap">
                         <i class="fas fa-key icon"></i>
@@ -959,7 +996,7 @@
             <div class="dev">
                 Built by <a href="https://techycsr.dev" target="_blank" rel="noreferrer"><strong>@TechyCSR</strong></a>
                 <span style="opacity:0.5; margin: 0 8px;">·</span>
-                <a href="https://github.com/TechyCSR/OpenCluely" target="_blank" rel="noreferrer">
+                <a href="https://github.com/Kaberia-Timo/OpenCluely" target="_blank" rel="noreferrer">
                     <i class="fab fa-github"></i> GitHub
                 </a>
             </div>
