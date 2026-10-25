@@ -125,7 +125,7 @@ jobs:
           if [ -z "$PREV_TAG" ]; then
             PREV_TAG=$(git tag --sort=-creatordate | grep -vx "${CURRENT_TAG}" | while read -r t; do
               if git merge-base --is-ancestor "$t" "${CURRENT_TAG}" 2>/dev/null; then echo "$t"; break; fi
-            done | head -1)
+            done | head -1 || true)  # grep exits 1 when this is the only tag; don't abort under pipefail
           fi
 
           # This fork carries no upstream tags, so its first release would
@@ -172,7 +172,7 @@ jobs:
             if [ -n "$PREV_TAG" ]; then
               echo "This release includes **${COMMIT_COUNT} commits** since ${PREV_TAG}."
             else
-              echo "First release of OpenCluely — **${COMMIT_COUNT} commits**."
+              echo "First release of this fork — **${COMMIT_COUNT} commits**."
             fi
             echo ""
             cat CHANGELOG_SECTION.md
