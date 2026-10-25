@@ -185,18 +185,24 @@ jobs:
 
           > **macOS:** no pre-built build is shipped. The app is unsigned/un-notarized, so macOS Gatekeeper blocks it as "damaged". Run OpenCluely from source instead:
           > ```bash
-          > git clone https://github.com/TechyCSR/OpenCluely && cd OpenCluely && ./setup.sh
+          > git clone https://github.com/Kaberia-Timo/OpenCluely && cd OpenCluely && ./setup.sh
           > ```
-          > Requires Node.js 18+. See the [README](https://github.com/TechyCSR/OpenCluely#quick-start) for details.
+          > Requires Node.js 20+. See the [README](https://github.com/Kaberia-Timo/OpenCluely#run-from-source) for details.
+
+          > **Windows SmartScreen:** the installer is not code-signed. Click **More info → Run anyway**.
 
           ## First Run
 
-          On first launch, OpenCluely opens the **Settings** window automatically for your **Google Gemini API key**.
-          Get a free key from [Google AI Studio](https://aistudio.google.com/). You can also edit `.env` directly.
+          On first launch a setup wizard asks you to choose an AI provider:
+          - **Google Gemini:** free API key from [Google AI Studio](https://aistudio.google.com/apikey)
+          - **OpenAI:** paid API key from [platform.openai.com](https://platform.openai.com/api-keys)
+          - **Ollama:** free and local. Install [Ollama](https://ollama.com/download), then run `ollama pull gemma3:4b` once.
+
+          You can change it any time in **Settings → AI Provider** (`Ctrl + ,`).
 
           ## Optional: Local Whisper (offline speech)
 
-          Install **Python 3.10+** and **ffmpeg**, then run:
+          Install **Python 3.10+**, then choose **Local Whisper** in the setup wizard and click **Install**. From source you can also run:
           ```bash
           ./setup.sh --skip-install-system-deps
           ```

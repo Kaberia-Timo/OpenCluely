@@ -1,7 +1,7 @@
 {
   "name": "opencluely",
-  "version": "1.0.0",
-  "description": "AI Problem Solving Assistant",
+  "version": "1.1.0",
+  "description": "Desktop AI assistant overlay: ask by voice, text or screenshot (Gemini, OpenAI or local Ollama)",
   "main": "main.js",
   "scripts": {
     "start": "env -u ELECTRON_RUN_AS_NODE electron .",
@@ -26,9 +26,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/TechyCSR/OpenCluely"
+    "url": "https://github.com/Kaberia-Timo/OpenCluely"
   },
-  "license": "ISC",
+  "license": "Apache-2.0",
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.2.0",
     "@google/genai": "^2.9.0",

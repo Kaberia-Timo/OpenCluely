@@ -2,236 +2,239 @@
 
 # OpenCluely
 
-**The invisible AI interview copilot.**
+**A desktop AI assistant that answers what you ask by voice, text, or screenshot.**
 
-Real-time AI help on a stealth overlay that screen sharing cannot see. Ask by voice or screenshot, and get clear answers that stream in as you need them.
+Answers come from Google Gemini, OpenAI, or a free model running on your own computer through Ollama.
 
 <p>
-  <a href="https://github.com/TechyCSR/OpenCluely/releases/latest"><img src="https://img.shields.io/github/v/release/TechyCSR/OpenCluely?style=for-the-badge&label=Latest&color=111111&labelColor=000000" alt="Latest release" /></a>
-  <a href="https://github.com/TechyCSR/OpenCluely/releases"><img src="https://img.shields.io/github/downloads/TechyCSR/OpenCluely/total?style=for-the-badge&color=111111&labelColor=000000" alt="Downloads" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-111111?style=for-the-badge&labelColor=000000" alt="MIT License" /></a>
-  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20macOS%20%7C%20Linux-111111?style=for-the-badge&labelColor=000000" alt="Platforms" />
+  <a href="https://github.com/Kaberia-Timo/OpenCluely/releases/latest"><img src="https://img.shields.io/github/v/release/Kaberia-Timo/OpenCluely?style=for-the-badge&label=Latest&color=111111&labelColor=000000" alt="Latest release" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-111111?style=for-the-badge&labelColor=000000" alt="Apache 2.0 License" /></a>
+  <img src="https://img.shields.io/badge/Platforms-Windows%20%7C%20Linux%20%7C%20macOS%20(source)-111111?style=for-the-badge&labelColor=000000" alt="Platforms" />
 </p>
 
-<a href="https://opencluely.techycsr.dev"><b>Website</b></a> &nbsp;|&nbsp;
-<a href="#download">Download</a> &nbsp;|&nbsp;
-<a href="#quick-start">Quick start</a> &nbsp;|&nbsp;
-<a href="#how-it-works">How it works</a>
+<a href="#install-on-windows"><b>Install</b></a> &nbsp;|&nbsp;
+<a href="#choose-an-ai-provider">Choose a provider</a> &nbsp;|&nbsp;
+<a href="#using-opencluely">Use it</a> &nbsp;|&nbsp;
+<a href="#run-from-source">Run from source</a>
 
 </div>
 
-## Demo
+> This is a fork of [TechyCSR/OpenCluely](https://github.com/TechyCSR/OpenCluely), released under the same Apache 2.0 license. See [What this fork changes](#what-this-fork-changes).
 
-https://github.com/user-attachments/assets/896a7140-1e85-405d-bfbe-e05c9f3a816b
+## What it does
 
-## What it is
+OpenCluely puts a small floating window on your screen. You can:
 
-OpenCluely is a desktop app for technical interviews and practice. It places a small overlay on your screen that recording and conferencing tools do not capture. You can speak a question or take a screenshot, and the AI answers in real time. The answer streams into a floating window and an optional chat panel, with clean code blocks and syntax highlighting.
+- **Type** a question in the chat window.
+- **Speak** a question. It's transcribed on your computer with Whisper.
+- **Take a screenshot.** It answers every question visible on screen, numbered to match.
 
-It is free and open source. Processing stays on your machine, and the only thing that leaves your device is the request you send to the AI provider.
+Answers are short by default and stream in as they're written. Ask it to "explain" or "go into detail" when you want more. It remembers the conversation, so follow-up questions work.
 
-## Highlights
+## Install on Windows
 
-- **Invisible overlay.** Windows stay out of Zoom, Google Meet, Microsoft Teams, Discord, and OBS captures. You see the answer, the call does not.
-- **Hidden during screen share.** When a share starts, the app can hide every window on its own.
-- **Flexible local voice.** Choose manual start/stop capture or automatic voice-activity detection without fixed-timer sentence cuts.
-- **Configurable streamed answers.** Route voice replies to chat, the floating overlay, or both.
-- **Direct image analysis.** Screenshots go straight to Gemini for visual reasoning, with no slow OCR step in between.
-- **Session memory.** The whole conversation is remembered, so follow-ups, edge cases, and optimizations keep their context.
-- **Language aware.** Tailored answers for C++, C, Python, Java, and JavaScript.
-- **Stealthy by design.** Runs under ordinary system names, ships with no telemetry, and keeps your session local.
-- **Cross platform.** Pre-built installers for Windows and Linux (.deb and AppImage). macOS runs from source in one command.
+You don't need any command-line tools for this.
 
-## Download
+1. Open the [latest release](https://github.com/Kaberia-Timo/OpenCluely/releases/latest).
+2. Download **`OpenCluely-Setup-<version>.exe`**.
+3. Run it. Windows may show **"Windows protected your PC"**, because the installer isn't code-signed. Click **More info**, then **Run anyway**.
+4. Pick an install folder and finish. The installer adds Start Menu and desktop shortcuts.
+5. Start **OpenCluely**. A setup wizard opens on first launch:
+   - **AI provider:** choose Gemini, OpenAI, or Ollama. See [Choose an AI provider](#choose-an-ai-provider).
+   - **Speech (optional):** choose local Whisper and click **Install**, or skip it.
 
-Pre-built installers are published with every release. These links always point at the newest version.
+You can change any of this later in **Settings** (`Ctrl + ,`).
 
-| Platform | File | Notes |
-|---|---|---|
-| Windows | [Setup .exe](https://github.com/TechyCSR/OpenCluely/releases/latest) | NSIS installer. Adds a Start Menu shortcut. |
-| Linux (Debian or Ubuntu) | [.deb](https://github.com/TechyCSR/OpenCluely/releases/latest) | Pulls system deps automatically (Python, ffmpeg, GTK). |
-| Linux (universal) | [.AppImage](https://github.com/TechyCSR/OpenCluely/releases/latest) | No install. Run `chmod +x` then launch. |
+> **Linux:** the same release page has a `.deb` (Debian/Ubuntu) and an `.AppImage`. **macOS:** there's no pre-built app, because unsigned apps are blocked by Gatekeeper. Use [Run from source](#run-from-source).
 
-> **macOS:** there is no pre-built download. The app is unsigned and un-notarized, so macOS Gatekeeper blocks it as "damaged and can't be opened." Run OpenCluely from source instead — see [Quick start](#quick-start). It is a one-line `./setup.sh` once Node.js is installed.
+## Choose an AI provider
 
-Every build is produced automatically on GitHub Actions and ships with SHA-256 checksums. Each release also lists the full set of commits it includes.
+| Provider | Cost | Speed | Reads screenshots | What you need |
+|---|---|---|---|---|
+| **Google Gemini** | Free tier, with a daily limit | Fast, 1–5 s | Yes | A free API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| **OpenAI** | Pay per use, about $0.001 per question | Fast, 1–5 s | Yes | An API key and prepaid credit from [platform.openai.com](https://platform.openai.com/api-keys). A ChatGPT Plus subscription doesn't include API use. |
+| **Ollama (local)** | Free, unlimited, private | Depends on your PC, 15–90 s on a laptop CPU | With a vision model such as `gemma3:4b` | [Ollama](https://ollama.com/download) installed, plus one downloaded model |
 
-The website at [opencluely.techycsr.dev](https://opencluely.techycsr.dev) detects your operating system and offers the right installer directly.
+### Setting up Ollama (free, runs on your computer)
 
-## Quick start
-
-If you would rather build from source, three steps are all it takes.
-
-1. Clone the repository.
+1. Install Ollama from [ollama.com/download](https://ollama.com/download). It starts automatically and shows a llama icon in the system tray.
+2. Download a model once. Open **Command Prompt** or **PowerShell** and run:
 
    ```bash
-   git clone https://github.com/TechyCSR/OpenCluely.git
-   cd OpenCluely
+   ollama pull gemma3:4b
    ```
 
-2. Run the setup script.
+   `gemma3:4b` is about 3.3 GB, reads screenshots, and runs on a normal laptop. With a dedicated graphics card you can try bigger models.
+3. In OpenCluely, choose **Ollama (local, free)** in the wizard or in **Settings → AI Provider**, and enter the model name (`gemma3:4b`).
 
-   ```bash
-   ./setup.sh
-   ```
+Nothing leaves your computer with Ollama. Speed depends on your hardware: without a graphics card that Ollama can use, expect about 15–30 s for a short answer and 45–90 s for a screenshot.
 
-   The script installs Node dependencies, creates your `.env` from the example, sets up a local Whisper virtual environment, points the config at it, and launches the app.
+### Other OpenAI-compatible services
 
-3. Add your Gemini key.
+Choose **Other OpenAI-compatible** in **Settings → AI Provider** and enter the service's server address (ending in `/v1`), API key, and model. This works with xAI, DeepSeek, Groq, Mistral, LM Studio and similar services.
 
-   On first launch the Settings window opens automatically. Get a free key from [Google AI Studio](https://aistudio.google.com/) and paste it in, or edit `.env` directly. Both work, and changes are picked up without a restart.
+## Using OpenCluely
 
-### Platform notes
+| Action | Shortcut |
+|---|---|
+| Screenshot and answer | `Ctrl + Shift + S` |
+| Start or stop voice input | `Alt + R` |
+| Open the chat window | `Ctrl + Shift + C` |
+| Show or hide all windows | `Ctrl + Shift + V` |
+| Make the overlay clickable or click-through | `Ctrl + Shift + I` or `Alt + A` |
+| Settings | `Ctrl + ,` |
 
-- On Windows, use Git Bash (included with Git for Windows) or WSL to run `setup.sh`.
-- On macOS and Linux, your normal terminal works.
-- **macOS users must build from source** (steps above) — there is no pre-built `.dmg`. Because the app is unsigned, a downloaded build would be blocked by Gatekeeper as "damaged"; running from source avoids that entirely.
-- No manual `npm` commands are needed. The script handles everything.
+On macOS, use `Cmd` instead of `Ctrl`.
 
-### Setup script options
+**To quit:** open Settings (`Ctrl + ,`) and click **Quit**.
+
+**Answer length:**
+- Typed and spoken questions get short answers, 1–3 sentences or a few bullets.
+- Ask with words like "explain", "in detail" or "step by step" for a full answer.
+- Screenshots answer every question shown. Factual questions get short answers; open-ended questions ("How would you…", "What would you do if…") get a few sentences with concrete steps.
+- Coding questions always get complete code.
+
+**Tip:** with voice input on, everything the microphone hears can trigger a request. Turn it off with `Alt + R` when you aren't asking questions, especially on Gemini's free tier.
+
+## Run from source
+
+Use this for macOS, for development, or if you'd rather not run an installer.
+
+**Prerequisites:** [Node.js 20+](https://nodejs.org/) and [Git](https://git-scm.com/). Voice input also needs [Python 3.10+](https://www.python.org/downloads/).
 
 ```bash
-./setup.sh --build                # Build a distributable for your OS
-./setup.sh --ci                   # Use npm ci instead of npm install
-./setup.sh --no-run               # Set up only, do not launch
-./setup.sh --install-system-deps  # Install sox for the microphone (optional)
-./setup.sh --skip-whisper         # Skip the local Whisper bootstrap
+git clone https://github.com/Kaberia-Timo/OpenCluely.git
+```
+
+```bash
+cd OpenCluely
+```
+
+```bash
+npm install
+```
+
+```bash
+npx electron .
+```
+
+On first launch the setup wizard opens, the same as in the installed app. To set things up without the wizard, copy `env.example` to `.env` and edit it (see [Configuration](#configuration)).
+
+On macOS and Linux, or in Git Bash on Windows, `./setup.sh` does all of the above and also prepares local Whisper for voice input.
+
+## Build the installer yourself
+
+```bash
+npm run build:win
+```
+
+The installer appears in `dist/` as `OpenCluely-Setup-<version>.exe`. Use `npm run build:linux` for Linux packages.
+
+### Publishing a release
+
+Releases are built automatically by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)). Push a version tag and the workflow builds the Windows installer and Linux packages, then attaches them to a new GitHub Release with SHA-256 checksums:
+
+```bash
+git tag v1.1.0
+```
+
+```bash
+git push origin v1.1.0
 ```
 
 ## Configuration
 
-The setup script writes sensible defaults. The only required value is a Gemini API key.
+Settings live in a `.env` file. The Settings window and setup wizard write it for you.
+
+- **Installed app (Windows):** `%APPDATA%\OpenCluely\.env`
+- **Running from source:** `.env` in the project folder
 
 ```bash
-# Required
+# AI provider: gemini (default) or openai (also used for Ollama and other compatible services)
+LLM_PROVIDER=gemini
+
+# Google Gemini
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Optional speech provider. Pick one.
+# OpenAI or an OpenAI-compatible service
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# Example: local Ollama instead
+# LLM_PROVIDER=openai
+# OPENAI_BASE_URL=http://localhost:11434/v1
+# OPENAI_MODEL=gemma3:4b
+# OPENAI_API_KEY=ollama
+
+# Speech (optional): whisper (local) or azure
 SPEECH_PROVIDER=whisper
-
-# Azure option
-AZURE_SPEECH_KEY=your_azure_speech_key
-AZURE_SPEECH_REGION=your_region
-
-# Local Whisper option
-WHISPER_COMMAND=whisper
-WHISPER_MODEL_DIR=.whisper-models
-WHISPER_MODEL=small
-WHISPER_LANGUAGE=auto
-WHISPER_DEVICE=auto
-WHISPER_PYTHON=
-WHISPER_CAPTURE_MODE=vad
-WHISPER_RESPONSE_TARGET=both
-WHISPER_MANUAL_MAX_MS=90000
-WHISPER_GPU_IDLE_MS=60000
+WHISPER_MODEL=base
 ```
 
-Speech is optional. If no provider is configured, the microphone button hides itself across the app.
-
-## Optional voice setup
-
-You can use local Whisper for offline transcription or Azure Speech for a cloud option.
-
-For local Whisper, `./setup.sh` handles the full setup. It creates `.venv-whisper`, installs `openai-whisper`, points `.env` at the virtual environment, creates `.whisper-models`, and runs a quick speech test. The app reads its own PCM WAV recordings directly; ffmpeg is only needed when transcribing other audio formats through the CLI fallback.
-
-For Azure Speech, create a Speech resource in the [Azure Portal](https://portal.azure.com/), then add the key and region to `.env` with `SPEECH_PROVIDER=azure`.
-
-## How it works
-
-1. **Ask.** Use automatic pause detection, choose manual start/stop capture in Settings, or use the screenshot shortcut.
-2. **Reason.** Gemini reads the audio or image with full conversation context and works toward a precise answer.
-3. **Answer.** Voice responses stream to chat, the overlay, or both, according to Settings.
-
-## Keyboard shortcuts
-
-| Action | Shortcut | Description |
-|---|---|---|
-| Screenshot capture | `Cmd/Ctrl + Shift + S` | Capture the screen and analyze it with Gemini |
-| Toggle speech | `Alt + R` | Start or stop voice recognition, if configured |
-| Toggle visibility | `Cmd/Ctrl + Shift + V` | Show or hide all windows |
-| Toggle interaction | `Cmd/Ctrl + Shift + I` or `Alt + A` | Enable or disable click through |
-| Open chat | `Cmd/Ctrl + Shift + C` | Open the interactive chat window |
-| Settings | `Cmd/Ctrl + ,` | Open the settings panel |
-
-## Project status
-
-OpenCluely is under active development. The core is stable and improvements ship regularly.
-
-### Done
-
-- Stealth overlay with a draggable command bar and a click through toggle
-- Hidden during screen share, with automatic hiding when a share begins
-- Screenshot capture with direct Gemini analysis, no OCR step
-- Configurable manual or VAD-driven voice capture
-- Persistent local Whisper worker with optional CUDA acceleration and idle GPU release
-- Configurable chat/overlay routing for streamed voice answers
-- Whisper hallucination filter that drops phantom phrases on silence
-- AI response window with markdown and syntax highlighting
-- Global shortcuts for capture, visibility, interaction, chat, and settings
-- Session memory and a full chat UI
-- Language picker and a DSA skill prompt
-- Optional Azure Speech and local Whisper, with an auto hiding mic button
-- Multi-monitor and area capture support
-- Window binding and positioning
-- Settings management with disguise and stealth modes
-
-### Planned
-
-- Multiple model backends alongside Gemini (OpenAI, Anthropic, local)
-- Auto typing of code snippets into editors and IDEs
-- Export of conversation history to markdown or PDF
-- Deeper stealth, including process name randomization
+See [`env.example`](env.example) for every option, including Azure Speech and Whisper tuning.
 
 ## Troubleshooting
 
 <details>
-<summary>Setup issues</summary>
+<summary><b>The answer says "I'm having trouble processing that right now…"</b></summary>
 
-- **setup.sh will not run.** Make sure you are in the project folder (`cd OpenCluely`) and that the script is executable (`chmod +x setup.sh`). On Windows, use Git Bash.
-- **Setup stops with exit code 130.** That means Ctrl+C was pressed. Run `./setup.sh` again.
-- **Node or npm not found.** Install Node.js 18 or newer from [nodejs.org](https://nodejs.org/), restart the terminal, and retry.
+That's a fallback message shown when the AI request failed. Common causes:
 
+- **Gemini daily limit reached.** The free tier allows a limited number of requests per day per model. Wait for the reset, enable billing on your Google AI project, or switch provider in Settings.
+- **Ollama isn't running.** Start Ollama from the Start menu, and check that the model name matches `ollama list`.
+- **Wrong or missing API key.** Re-enter it in Settings → AI Provider.
+
+The detailed error is in the log files at `%USERPROFILE%\.OpenCluely\logs\`.
 </details>
 
 <details>
-<summary>App issues</summary>
+<summary><b>Answers are slow with Ollama</b></summary>
 
-- **Electron will not start or shows a blank window on Linux.** Try `npm run dev`, and make sure X11 or XWayland is available in headless setups.
-- **macOS screen capture does not work.** Grant Screen Recording permission under System Settings, Privacy and Security, then relaunch the app.
-- **Windows SmartScreen blocks the app.** Click More info, then Run anyway, or use `npm start` during development.
-- **Microphone or voice not working.** Voice is optional. For Azure, add valid keys to `.env`. For Whisper, install `openai-whisper`, `ffmpeg`, and `sox`, then set `SPEECH_PROVIDER=whisper`.
-
+Local models run on your processor unless Ollama can use your graphics card. Smaller models are faster: `gemma3:4b` is a good balance, and `gemma3:1b` is faster but simpler. Screenshots are the slowest, because the image itself takes time to analyse. For fast screenshot answers, use Gemini or OpenAI.
 </details>
 
 <details>
+<summary><b>Screenshots aren't answered, or the answer describes the screen</b></summary>
 
-<summary> Limitations </summary>
-
-- **Screen-capture invisibility does not work on Linux.** The overlay stays hidden from screen shares and recordings only on **macOS** and **Windows**. This relies on Electron's `setContentProtection`, which maps to `NSWindowSharingNone` on macOS and `WDA_EXCLUDEFROMCAPTURE` on Windows. Electron provides **no equivalent on Linux** (neither X11 nor Wayland), so on Linux the call is a silent no-op and the overlay **will be visible** to anyone you screen-share with. This is a platform limitation, not a bug — there is no window flag on Linux that excludes a window from framebuffer capture. If you need capture-invisibility, run OpenCluely on macOS or Windows. As a partial workaround on Linux, share a single application window instead of your entire screen, or place the overlay on a monitor you are not sharing.
-
+Make sure the provider supports images: with Ollama, use a vision model such as `gemma3:4b`. Some older text-only models, like `llama2`, can't read images. Small local models occasionally merge or skip questions on very long lists.
 </details>
 
+<details>
+<summary><b>Voice input doesn't work</b></summary>
 
+Voice is optional. For local Whisper, install Python 3.10+, then open Settings or rerun the wizard and click **Install**. The microphone button hides itself when no speech provider is configured.
+</details>
 
-## Privacy and ethics
+<details>
+<summary><b>Windows SmartScreen blocks the installer</b></summary>
 
-OpenCluely collects no data and sends no telemetry. Processing happens locally, and your session stays on your device. Requests to the AI provider are encrypted in transit.
+The installer isn't code-signed. Click **More info**, then **Run anyway**. You can check the download against `SHA256SUMS.txt` on the release page.
+</details>
 
-The app is built for learning and practice. You are responsible for following the rules of any interview you take and the policies of the companies involved.
+## Privacy and responsible use
+
+- OpenCluely sends no telemetry. Your questions, screenshots and voice transcripts go only to the AI provider you choose. With Ollama, nothing leaves your computer.
+- On Windows and macOS, the overlay is excluded from screen capture and screen sharing by design.
+- Use OpenCluely only where AI assistance is allowed. Don't use it to get answers in exams, interviews or other situations where you're expected to work unaided. Your AI provider's usage policy applies to everything you send.
+
+## What this fork changes
+
+Compared with [TechyCSR/OpenCluely](https://github.com/TechyCSR/OpenCluely):
+
+- **Answers any topic,** not only data structures and algorithms (DSA).
+- **More AI providers:** OpenAI, local Ollama, and other OpenAI-compatible services alongside Gemini. You choose in the setup wizard or Settings.
+- **Concise answers by default,** with detail when you ask for it. This makes local models about 4× faster for everyday questions.
+- **Better screenshots:** captures at full resolution on scaled displays (they were blurry at 150% scaling), and every question on screen gets answered instead of the screen being described.
+- **Quieter logs:** the repeating "Source is not capturable" error is fixed.
 
 ## License
 
-Released under the MIT License. See [LICENSE](LICENSE) for details.
+Apache License 2.0. See [LICENSE](LICENSE). Original project by [TechyCSR](https://github.com/TechyCSR/OpenCluely). This fork's changes are listed above and in the git history.
 
 ## Acknowledgments
 
-- Google Gemini for the AI reasoning
-- Azure Speech and OpenAI Whisper for optional voice input
-- Electron for the cross platform desktop runtime
-- [Vysper by varun-singhh](https://github.com/varun-singhh/Vysper) for UI and structure inspiration
-
-<div align="center">
-
-Built by [TechyCSR](https://techycsr.dev). If OpenCluely helped you, consider giving it a star ⭐
-
-</div>
+- [TechyCSR/OpenCluely](https://github.com/TechyCSR/OpenCluely), the original project
+- Google Gemini, OpenAI and [Ollama](https://ollama.com) for the AI backends
+- OpenAI Whisper and Azure Speech for voice input
+- Electron for the desktop runtime
