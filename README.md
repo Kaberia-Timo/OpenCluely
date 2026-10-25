@@ -135,11 +135,11 @@ The installer appears in `dist/` as `OpenCluely-Setup-<version>.exe`. Use `npm r
 Releases are built automatically by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)). Push a version tag and the workflow builds the Windows installer and Linux packages, then attaches them to a new GitHub Release with SHA-256 checksums:
 
 ```bash
-git tag v1.1.0
+git tag v1.9.0
 ```
 
 ```bash
-git push origin v1.1.0
+git push origin v1.9.0
 ```
 
 ## Configuration

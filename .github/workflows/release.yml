@@ -128,7 +128,14 @@ jobs:
             done | head -1)
           fi
 
-          if [ -z "$PREV_TAG" ]; then
+          # This fork carries no upstream tags, so its first release would
+          # otherwise list the whole upstream history. Start from the upstream
+          # commit the fork branched from instead.
+          FORK_BASE="0a9da75"
+          if [ -z "$PREV_TAG" ] && git merge-base --is-ancestor "$FORK_BASE" "${CURRENT_TAG}" 2>/dev/null; then
+            RANGE="${FORK_BASE}..${CURRENT_TAG}"
+            RANGE_LABEL="Changes since forking from [TechyCSR/OpenCluely](https://github.com/TechyCSR/OpenCluely) ([\`${FORK_BASE}...${CURRENT_TAG}\`](${REPO_URL}/compare/${FORK_BASE}...${CURRENT_TAG}))"
+          elif [ -z "$PREV_TAG" ]; then
             RANGE=""
             RANGE_LABEL="Initial release"
           else
