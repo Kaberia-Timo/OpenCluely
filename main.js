@@ -107,6 +107,7 @@ const llmService = require("./src/services/llm.service");
 // Managers
 const windowManager = require("./src/managers/window.manager");
 const sessionManager = require("./src/managers/session.manager");
+const lectureManager = require("./src/managers/lecture.manager");
 
 class ApplicationController {
   constructor() {
@@ -338,8 +339,11 @@ class ApplicationController {
       if (!webContents || webContents.isDestroyed()) {
         return false;
       }
+      return isTrustedAppUrl(webContents.getURL());
+    };
+    function isTrustedAppUrl(url) {
       try {
-        const pagePath = path.resolve(fileURLToPath(webContents.getURL()));
+        const pagePath = path.resolve(fileURLToPath(url));
         const appRoot = path.resolve(__dirname);
         const normalizeForComparison = (value) => process.platform === "win32"
           ? value.toLowerCase()
@@ -350,7 +354,29 @@ class ApplicationController {
       } catch (_) {
         return false;
       }
-    };
+    }
+
+    // Lecture capture: answer the renderer's getDisplayMedia() with a screen
+    // source plus 'loopback' audio (the computer's own output, Windows only).
+    // The renderer stops the video track and transcribes just the audio.
+    const { desktopCapturer } = require("electron");
+    appSession.setDisplayMediaRequestHandler((request, callback) => {
+      const frameUrl = request.frame && request.frame.url;
+      if (!frameUrl || !isTrustedAppUrl(frameUrl)) {
+        callback({});
+        return;
+      }
+      desktopCapturer.getSources({ types: ["screen"] }).then((sources) => {
+        if (!sources.length) {
+          callback({});
+          return;
+        }
+        callback({ video: sources[0], audio: process.platform === "win32" ? "loopback" : undefined });
+      }).catch((error) => {
+        logger.error("Display media request failed", { error: error.message });
+        callback({});
+      });
+    });
 
     // Electron exposes camera/microphone access as the single `media`
     // permission. The requested device type is provided separately in details.
@@ -398,6 +424,7 @@ class ApplicationController {
       "CommandOrControl+,": () => windowManager.showSettings(),
       "Alt+A": () => windowManager.toggleInteraction(),
       "Alt+R": () => this.toggleSpeechRecognition(),
+      "Alt+L": () => this.toggleLectureCapture(),
       "CommandOrControl+Shift+T": () => windowManager.forceAlwaysOnTopForAllWindows(),
       "CommandOrControl+Shift+Alt+T": () => {
         const results = windowManager.testAlwaysOnTopForAllWindows();
@@ -417,8 +444,8 @@ class ApplicationController {
   }
 
   setupServiceEventHandlers() {
-    speechService.on("recording-started", () => {
-      windowManager.handleRecordingStarted();
+    speechService.on("recording-started", (info) => {
+      windowManager.handleRecordingStarted(info);
     });
 
     speechService.on("recording-stopped", () => {
@@ -426,7 +453,23 @@ class ApplicationController {
     });
 
     speechService.on("transcription", (text) => {
+      if (lectureManager.isCapturing()) {
+        lectureManager.addTranscript(text);
+        return;
+      }
       this.handleTranscriptionFragment(text);
+    });
+
+    speechService.on("whisper-stop-complete", () => {
+      if (!lectureManager.isCapturing()) {
+        return;
+      }
+      if (lectureManager.active) {
+        // Stopped by something other than Alt+L (e.g. the capture failed)
+        lectureManager.stop();
+        this.stopLectureStatusTimer();
+      }
+      this.processLectureClip();
     });
 
     speechService.on("interim-transcription", (text) => {
@@ -447,6 +490,11 @@ class ApplicationController {
     });
 
     speechService.on("error", (error) => {
+      if (lectureManager.active && !speechService.getStatus().isRecording) {
+        // Lecture capture never started (e.g. no Whisper); don't leave it armed
+        lectureManager.takeClip();
+        this.stopLectureStatusTimer();
+      }
       // In error, still compute availability
       this.speechAvailable = speechService.isAvailable ? speechService.isAvailable() : false;
       BrowserWindow.getAllWindows().forEach((window) => {
@@ -970,6 +1018,139 @@ class ApplicationController {
       } catch (error) {
         logger.error("Error starting speech recognition:", error);
       }
+    }
+  }
+
+  /**
+   * Alt+L: start or stop capturing what the computer plays (a lecture). The
+   * clip is transcribed while it plays; on stop it becomes study notes in the
+   * chat and in today's notes file under Documents\OpenCluely Lectures.
+   */
+  toggleLectureCapture() {
+    if (lectureManager.active) {
+      lectureManager.stop();
+      this.stopLectureStatusTimer();
+      this.lectureStatus("Lecture clip captured; transcribing the last part");
+      if (speechService.getStatus().isRecording) {
+        speechService.stopRecording(); // notes follow on "whisper-stop-complete"
+      } else {
+        this.processLectureClip();
+      }
+      return;
+    }
+    if (lectureManager.finishing) {
+      this.lectureStatus("Still making notes for the previous clip; try again in a moment");
+      return;
+    }
+
+    const isAvailable = typeof speechService.isAvailable === "function" && speechService.isAvailable();
+    if (!isAvailable || speechService.provider !== "whisper") {
+      this.lectureStatus("Lecture capture needs Local Whisper: set it up in Settings → Speech Recognition");
+      return;
+    }
+    if (speechService.getStatus().isRecording) {
+      this.lectureStatus("Voice input is on; press Alt+R to stop it before capturing a lecture");
+      return;
+    }
+
+    lectureManager.start();
+    windowManager.showChatWindow();
+    this.lectureStatus("Recording lecture audio. Press Alt+L to stop and get notes");
+    speechService.startRecording({ source: "system" });
+    this.startLectureStatusTimer();
+  }
+
+  lectureStatus(status) {
+    windowManager.broadcastToAllWindows("speech-status", { status, available: this.speechAvailable });
+  }
+
+  // Live progress on the in-place interim line (status messages would each add a chat line)
+  startLectureStatusTimer() {
+    this.stopLectureStatusTimer();
+    this._lectureTimer = setInterval(() => {
+      const totalSeconds = Math.floor(lectureManager.elapsedMs() / 1000);
+      const clock = `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
+      BrowserWindow.getAllWindows().forEach((window) => {
+        window.webContents.send("interim-transcription", {
+          text: `🎧 Recording lecture · ${clock} · ${lectureManager.wordCount()} words so far`
+        });
+      });
+    }, 3000);
+  }
+
+  stopLectureStatusTimer() {
+    if (this._lectureTimer) {
+      clearInterval(this._lectureTimer);
+      this._lectureTimer = null;
+    }
+  }
+
+  /** Runs once every segment of the stopped clip has been transcribed. */
+  async processLectureClip() {
+    const clip = lectureManager.takeClip();
+    const minutes = Math.max(1, Math.round((clip.endedAt - clip.startedAt) / 60000));
+
+    if (!clip.text) {
+      this.lectureStatus("No speech was captured in that lecture clip. Is audio playing through this laptop's speakers or headphones?");
+      return;
+    }
+
+    this.sendToVoiceResponseWindows("transcription-received", {
+      text: `🎧 Lecture clip: ${minutes} min, ${clip.words} words. Making notes…`
+    });
+
+    this._responseSeq = (this._responseSeq || 0) + 1;
+    const messageId = `lecture-${Date.now()}-${this._responseSeq}`;
+    this.sendToVoiceResponseWindows("transcription-llm-response-start", { messageId, skill: this.activeSkill });
+
+    try {
+      const result = await llmService.processLectureClipStream(clip.text, (delta) => {
+        this.sendToVoiceResponseWindows("transcription-llm-response-chunk", { messageId, delta });
+      });
+
+      let savedNote = "";
+      try {
+        const filePath = lectureManager.appendToNotes({
+          startedAt: clip.startedAt,
+          endedAt: clip.endedAt,
+          notes: result.response,
+          transcript: clip.text
+        });
+        savedNote = `\n\n_Saved to ${filePath}_`;
+      } catch (error) {
+        logger.error("Failed to save lecture notes", { error: error.message });
+        savedNote = `\n\n_Couldn't save the notes file: ${error.message}_`;
+      }
+
+      // Keep the notes (not the long transcript) in memory so follow-up questions work
+      sessionManager.addUserInput(`[Lecture clip, ${minutes} min, captured from computer audio]`, "speech");
+      sessionManager.addModelResponse(result.response, {
+        skill: this.activeSkill,
+        processingTime: result.metadata.processingTime,
+        isTranscriptionResponse: true
+      });
+
+      this.sendTranscriptionLLMResponseToVoiceTargets({
+        response: result.response + savedNote,
+        metadata: { ...result.metadata, messageId }
+      });
+    } catch (error) {
+      logger.error("Lecture notes failed", { error: error.message });
+      // Never lose the lecture: save the transcript even when the AI is unavailable
+      let savedNote = "";
+      try {
+        const filePath = lectureManager.appendToNotes({
+          startedAt: clip.startedAt,
+          endedAt: clip.endedAt,
+          notes: `_Notes could not be generated (${error.message}). The transcript is below._`,
+          transcript: clip.text
+        });
+        savedNote = ` The transcript was saved to ${filePath}.`;
+      } catch (_) { /* reported below */ }
+      this.sendTranscriptionLLMResponseToVoiceTargets({
+        response: `Couldn't make notes for this clip: ${error.message}.${savedNote}`,
+        metadata: { messageId, usedFallback: true, isTranscriptionResponse: true }
+      });
     }
   }
 

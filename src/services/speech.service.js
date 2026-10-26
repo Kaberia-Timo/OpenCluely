@@ -539,7 +539,11 @@ class SpeechService extends EventEmitter {
     }
   }
 
-  startRecording() {
+  /**
+   * @param {{source?: 'microphone'|'system'}} options - 'system' captures what
+   *   the computer plays (loopback) for lecture capture; Whisper only.
+   */
+  startRecording({ source = 'microphone' } = {}) {
     try {
       if (!this.available) {
         const errorMsg = `Speech provider "${this.provider}" is not available`;
@@ -557,6 +561,12 @@ class SpeechService extends EventEmitter {
         this.emit('status', 'Please wait for the current transcription to finish');
         return;
       }
+
+      if (source === 'system' && this.provider !== 'whisper') {
+        this.emit('error', 'Lecture capture needs Local Whisper as the speech provider');
+        return;
+      }
+      this.captureSource = source === 'system' ? 'system' : 'microphone';
 
       this.sessionStartTime = Date.now();
       this.retryCount = 0;
@@ -685,7 +695,7 @@ class SpeechService extends EventEmitter {
     this.pendingFinal = false;
     this.manualStopRequested = false;
     this._resetVadState();
-    this.emit('recording-started');
+    this.emit('recording-started', { source: this.captureSource || 'microphone' });
     this.emit('status', 'Local Whisper recording started');
 
     if (this.whisperWorker.isConfigured()) {
@@ -1001,18 +1011,32 @@ class SpeechService extends EventEmitter {
     }
 
     try {
+      // A segment still transcribing would make the final flush only queue
+      // itself, and _cleanup() below would then discard that last audio.
+      await this._waitForTranscriptionIdle();
       await this._flushWhisperSegment({ final: true });
     } catch (error) {
       logger.error('Final Whisper transcription failed', { error: error.message });
       this.emit('error', `Whisper transcription failed: ${error.message}`);
     } finally {
+      const source = this.captureSource || 'microphone';
       this._cleanup();
       this.isProcessingAudio = false;
+      this.captureSource = 'microphone';
       this.whisperWorker.releaseWhenIdle();
       if (!captureAlreadyStopped) {
         this.emit('recording-stopped');
       }
       this.emit('status', 'Recording stopped');
+      // Every transcription of this session has been emitted by now.
+      this.emit('whisper-stop-complete', { source });
+    }
+  }
+
+  async _waitForTranscriptionIdle(timeoutMs = 180000) {
+    const start = Date.now();
+    while (this.transcriptionInFlight && Date.now() - start < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
 
@@ -1324,6 +1348,11 @@ class SpeechService extends EventEmitter {
   }
 
   _isManualCaptureMode() {
+    // Lecture clips can run for many minutes: always segment them with VAD so
+    // transcription keeps pace and the result is ready soon after stopping.
+    if (this.captureSource === 'system') {
+      return false;
+    }
     return this._getWhisperCaptureMode() === 'manual';
   }
 

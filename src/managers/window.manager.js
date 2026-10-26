@@ -1794,11 +1794,11 @@ class WindowManager {
     }
   }
 
-  handleRecordingStarted() {
+  handleRecordingStarted(info = { source: 'microphone' }) {
     this.isRecording = true;
     this.showChatWindow();
-    // Notify all windows about recording state
-    this.broadcastToAllWindows('recording-started');
+    // Notify all windows about recording state (and whether it's mic or lecture audio)
+    this.broadcastToAllWindows('recording-started', info);
     logger.debug('Recording started, chat window shown');
   }
 

@@ -3,6 +3,30 @@ const logger = require('../core/logger').createServiceLogger('LLM');
 const config = require('../core/config');
 const { promptLoader } = require('../../prompt-loader');
 
+const LECTURE_NOTES_PROMPT = `You turn a recorded stretch of a university lecture into study notes for a busy graduate student (often a data science course). The student marked this stretch as important and will revise from your notes instead of rewatching.
+
+The input is an automatic speech-to-text transcript (or notes from its parts) and may contain recognition errors: infer the intended technical terms (e.g. "pee value" means p-value).
+
+Write Markdown with these sections. Leave out any section the lecture gives nothing for: don't write it with "none" or explain why it's empty.
+### Summary
+2-3 sentences: what this part of the lecture covered.
+### Key points
+Bullets, one idea each, in plain words.
+### Definitions and formulas
+Term: meaning. Formulas in plain text, each symbol explained.
+### Examples
+Worked examples or cases the lecturer used, briefly.
+### Emphasised by the lecturer
+Anything flagged as important, likely to be examined, or repeated.
+### To do
+Assignments, deadlines, readings and announcements, with dates exactly as the lecturer said them: never add a month, year or weekday that wasn't said.
+### Revise with
+2-4 short self-test questions on this material.
+
+Use only what the lecture says; if you correct an obvious transcription error, keep the corrected term. No introduction, no closing remarks.`;
+
+const LECTURE_PART_PROMPT = `Extract concise study notes from this part of a lecture transcript (automatic speech-to-text, may contain errors): key points, definitions, formulas, examples, anything the lecturer emphasised, and any deadlines or tasks. Bullets only, no introduction.`;
+
 class LLMService {
   constructor() {
     this.client = null;
@@ -334,6 +358,80 @@ class LLMService {
       `If the screenshot contains no question or task, say so in one sentence. ` +
       `Ignore browser tabs, menus, taskbars and other screen clutter. ` +
       `Skip introductions and closing remarks. Only include code if a task calls for it.${langNote}`;
+  }
+
+  /**
+   * Turn a lecture clip's transcript into study notes, streamed via onDelta.
+   * Long clips are summarised part by part first, because small local models
+   * (Ollama's default context is ~4k tokens) silently truncate long input.
+   * @returns {Promise<{response: string, metadata: object}>}
+   */
+  async processLectureClipStream(transcript, onDelta = null) {
+    if (!this.isInitialized) {
+      throw new Error('LLM service not initialized. Check the AI provider in Settings.');
+    }
+
+    const startTime = Date.now();
+    this.requestCount++;
+
+    const chunks = this._splitIntoWordChunks(transcript, 1800);
+    let material = `Lecture transcript (automatic speech-to-text, may contain recognition errors):\n\n${transcript}`;
+
+    if (chunks.length > 1) {
+      const partNotes = [];
+      for (const [index, chunk] of chunks.entries()) {
+        const partRequest = this._buildLectureRequest(LECTURE_PART_PROMPT, chunk, 1024);
+        partNotes.push(`Part ${index + 1} of ${chunks.length}:\n${await this.executeAlternativeRequest(partRequest)}`);
+      }
+      material = `Notes from consecutive parts of one lecture clip:\n\n${partNotes.join('\n\n')}`;
+    }
+
+    const request = this._buildLectureRequest(LECTURE_NOTES_PROMPT, material, 2048);
+    let response;
+    try {
+      response = await this.executeStreamingRequest(request, (delta) => {
+        if (typeof onDelta === 'function' && delta) onDelta(delta);
+      });
+    } catch (error) {
+      logger.warn('Streaming lecture notes failed, retrying without streaming', { error: error.message });
+      response = await this.executeAlternativeRequest(request);
+    }
+
+    logger.logPerformance('LLM lecture notes', startTime, {
+      words: transcript.split(/\s+/).length,
+      parts: chunks.length,
+      responseLength: response.length,
+      requestId: this.requestCount
+    });
+
+    return {
+      response,
+      metadata: {
+        processingTime: Date.now() - startTime,
+        requestId: this.requestCount,
+        usedFallback: false,
+        streamed: true,
+        isTranscriptionResponse: true,
+        isLectureNotes: true
+      }
+    };
+  }
+
+  _buildLectureRequest(systemPrompt, text, maxOutputTokens) {
+    const request = {
+      contents: [{ role: 'user', parts: [{ text }] }],
+      systemInstruction: { parts: [{ text: systemPrompt }] }
+    };
+    return this.applyGenerationDefaults(request, { temperature: 0.3, maxOutputTokens });
+  }
+
+  _splitIntoWordChunks(text, maxWords) {
+    const words = (text || '').split(/\s+/).filter(Boolean);
+    const chunks = [];
+    for (let i = 0; i < words.length; i += maxWords) {
+      chunks.push(words.slice(i, i + maxWords).join(' '));
+    }
+    return chunks.length ? chunks : [''];
   }
 
   async processTextWithSkill(text, activeSkill, sessionMemory = [], programmingLanguage = null) {

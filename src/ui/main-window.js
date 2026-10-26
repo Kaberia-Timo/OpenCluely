@@ -425,8 +425,8 @@ class MainWindowUI {
                 this.handleInteractionModeChanged(interactive);
             });
 
-            window.electronAPI.onRecordingStarted(() => {
-                this.handleRecordingStarted();
+            window.electronAPI.onRecordingStarted((event, info) => {
+                this.handleRecordingStarted(info);
             });
 
             window.electronAPI.onRecordingStopped(() => {
@@ -641,9 +641,11 @@ class MainWindowUI {
         logger.debug('Screenshot request received', { component: 'MainWindowUI' });
     }
 
-    handleRecordingStarted() {
+    handleRecordingStarted(info) {
         this.isRecording = true;
-        if (this.micButton) {
+        // 'system' = lecture capture of what the computer plays; else the mic
+        this._captureSource = info && info.source === 'system' ? 'system' : 'microphone';
+        if (this.micButton && this._captureSource === 'microphone') {
             this.micButton.classList.add('recording');
         }
         // On Windows and macOS, Whisper audio is captured here in the renderer
@@ -672,22 +674,25 @@ class MainWindowUI {
     }
 
     /**
-     * Capture microphone audio in the renderer using the Web Audio API.
-     * This is used for Whisper on Windows where node-record-lpcm16's sox/rec
+     * Capture audio in the renderer using the Web Audio API: the microphone,
+     * or for lecture capture the computer's own output (loopback). This is
+     * used for Whisper on Windows where node-record-lpcm16's sox/rec
      * dependencies are unavailable.
      */
     async _startRendererAudioCapture() {
         try {
             this._stopRendererAudioCapture();
 
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: { ideal: 16000 }
-                }
-            });
+            const stream = this._captureSource === 'system'
+                ? await this._getSystemAudioStream()
+                : await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                        sampleRate: { ideal: 16000 }
+                    }
+                });
             this._mediaStream = stream;
 
             const audioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -716,7 +721,7 @@ class MainWindowUI {
             source.connect(scriptNode);
             scriptNode.connect(audioContext.destination);
 
-            logger.info('Renderer audio capture started', { component: 'MainWindowUI' });
+            logger.info('Renderer audio capture started', { component: 'MainWindowUI', source: this._captureSource });
         } catch (error) {
             logger.error('Failed to start renderer audio capture', {
                 component: 'MainWindowUI',
@@ -727,6 +732,21 @@ class MainWindowUI {
                 await window.electronAPI.stopSpeechRecognition();
             } catch (_) { /* ignore */ }
         }
+    }
+
+    /**
+     * The computer's audio output via getDisplayMedia. The main process's
+     * display-media handler grants a screen source with audio: 'loopback'; the
+     * video track is stopped at once since only the audio is transcribed.
+     */
+    async _getSystemAudioStream() {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+        stream.getVideoTracks().forEach((track) => track.stop());
+        if (!stream.getAudioTracks().length) {
+            stream.getTracks().forEach((track) => track.stop());
+            throw new Error('No system audio track was granted');
+        }
+        return stream;
     }
 
     _stopRendererAudioCapture() {
