@@ -1,6 +1,6 @@
 {
   "name": "opencluely",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "Desktop AI assistant overlay: ask by voice, text or screenshot (Gemini, OpenAI or local Ollama)",
   "main": "main.js",
   "scripts": {

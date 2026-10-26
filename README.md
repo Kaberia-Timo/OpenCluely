@@ -28,6 +28,7 @@ OpenCluely puts a small floating window on your screen. You can:
 - **Type** a question in the chat window.
 - **Speak** a question. It's transcribed on your computer with Whisper.
 - **Take a screenshot.** It answers every question visible on screen, numbered to match.
+- **Capture part of a lecture.** Press `Alt + L` when something important starts in an online class, and again when it ends. It records what your computer plays and turns that stretch into study notes. See [Lecture capture](#lecture-capture).
 
 Answers are short by default and stream in as they're written. Ask it to "explain" or "go into detail" when you want more. It remembers the conversation, so follow-up questions work.
 
@@ -79,6 +80,7 @@ Choose **Other OpenAI-compatible** in **Settings → AI Provider** and enter the
 |---|---|
 | Screenshot and answer | `Ctrl + Shift + S` |
 | Start or stop voice input | `Alt + R` |
+| Start or stop lecture capture (computer audio) | `Alt + L` |
 | Open the chat window | `Ctrl + Shift + C` |
 | Show or hide all windows | `Ctrl + Shift + V` |
 | Make the overlay clickable or click-through | `Ctrl + Shift + I` or `Alt + A` |
@@ -95,6 +97,33 @@ On macOS, use `Cmd` instead of `Ctrl`.
 - Coding questions always get complete code.
 
 **Tip:** with voice input on, everything the microphone hears can trigger a request. Turn it off with `Alt + R` when you aren't asking questions, especially on Gemini's free tier.
+
+## Lecture capture
+
+Record the parts of an online class that matter, and get revision notes without rewatching.
+
+1. During a class (Zoom, Teams, Meet, a recorded video), press **`Alt + L`** when an important stretch starts. The chat shows a live timer and word count.
+2. Press **`Alt + L`** again when it ends.
+3. A few seconds after the lecturer's last words, notes appear in the chat with these sections:
+   - Summary
+   - Key points
+   - Definitions and formulas
+   - Examples
+   - What the lecturer emphasised
+   - Assignments and deadlines
+   - Self-test questions
+4. Each clip is also added to that day's notes file, **`Documents\OpenCluely Lectures\<date> Lectures.md`**, with its time and the full transcript underneath. Rename or move the file freely; the next clip starts a new file for a new day.
+
+Ask follow-up questions about a clip in the chat ("explain the second formula"), since its notes stay in the conversation.
+
+**What it needs:**
+- **Local Whisper** as the speech provider. Lecture capture is on Windows only for now.
+- The class audio must play through this computer's speakers or headphones.
+- It records nothing between your `Alt + L` presses, and the microphone is not used.
+
+**How long it takes with Ollama on a laptop CPU:** transcription keeps pace while you record. Notes take about 1–2 minutes per clip. Clips over about 1,800 words (roughly 12 minutes of speech) are summarised in parts first, so nothing gets cut off. With Gemini or OpenAI, notes take seconds.
+
+**Before recording a class:** check your institution's rules on recording lectures. With Ollama and local Whisper, the audio and transcript never leave your computer.
 
 ## Run from source
 
@@ -135,11 +164,11 @@ The installer appears in `dist/` as `OpenCluely-Setup-<version>.exe`. Use `npm r
 Releases are built automatically by GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)). Push a version tag and the workflow builds the Windows installer and Linux packages, then attaches them to a new GitHub Release with SHA-256 checksums:
 
 ```bash
-git tag v1.9.0
+git tag v1.10.0
 ```
 
 ```bash
-git push origin v1.9.0
+git push origin v1.10.0
 ```
 
 ## Configuration
@@ -227,6 +256,8 @@ Compared with [TechyCSR/OpenCluely](https://github.com/TechyCSR/OpenCluely):
 - **Concise answers by default,** with detail when you ask for it. This makes local models about 4× faster for everyday questions.
 - **Better screenshots:** captures at full resolution on scaled displays (they were blurry at 150% scaling), and every question on screen gets answered instead of the screen being described.
 - **Quieter logs:** the repeating "Source is not capturable" error is fixed.
+- **Lecture capture (`Alt + L`):** records what the computer plays, for the stretches you choose, and turns each clip into study notes saved to a daily Markdown file.
+- **No lost final words:** stopping voice input while Whisper is still busy no longer drops the last few seconds.
 
 ## License
 
